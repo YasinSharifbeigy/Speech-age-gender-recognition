@@ -17,13 +17,13 @@ dependencies = [
 test = ["pytest>=8", "httpx>=0.28"]
 
 [project.scripts]
-speech-age-gender = "oragen_service.cli:main"
+speech-age-gender = "speech_age_gender_service.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-oragen_service = ["ORAGEN-LICENSE.txt"]
+speech_age_gender_service = ["ORAGEN-LICENSE.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

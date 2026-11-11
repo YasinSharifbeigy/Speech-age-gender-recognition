@@ -13,8 +13,8 @@ from pathlib import Path
 import imageio_ffmpeg
 from fastapi.testclient import TestClient
 
-from oragen_service.api import create_app
-from oragen_service.engine import Engine
+from speech_age_gender_service.api import create_app
+from speech_age_gender_service.engine import Engine
 
 
 def main():

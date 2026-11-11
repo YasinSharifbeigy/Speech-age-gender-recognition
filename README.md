@@ -1,8 +1,19 @@
-# Speech Age and Gender API
+# Speech-age-gender-recognition
 
 Upload a single-speaker recording and receive JSON with an estimated age, a
 decade bucket, female/male scores, and predictions for each speech window.
 The service processes audio directly; transcription is not required.
+
+Clone the [GitHub repository](https://github.com/YasinSharifbeigy/Speech-age-gender-recognition)
+into any directory and enter the project root before running the commands below:
+
+```sh
+git clone https://github.com/YasinSharifbeigy/Speech-age-gender-recognition.git
+cd Speech-age-gender-recognition
+```
+
+If you already cloned it, enter your existing clone instead. All paths in this
+README are relative to the project root unless stated otherwise.
 
 ## Model overview
 
@@ -27,7 +38,7 @@ female. Evaluate compression and recording conditions on your deployment data.
 
 Architecture source: [markitantov/chimera_ml](https://github.com/markitantov/chimera_ml),
 commit `2f5429aa8ad6d0d7ec0a7acb9ed5fd7e337def8d`. Adapted code is MIT licensed;
-see [ORAGEN-LICENSE.txt](src/oragen_service/ORAGEN-LICENSE.txt). The checkpoint
+see [ORAGEN-LICENSE.txt](src/speech_age_gender_service/ORAGEN-LICENSE.txt). The checkpoint
 card does not specify a license; the code license alone does not establish
 commercial permission for the weights.
 
@@ -57,7 +68,7 @@ timings, not a throughput benchmark.
 ## Docker: CPU deployment
 
 Requires Docker Engine with Compose, or Docker Desktop using Linux containers.
-From this directory:
+From the project root:
 
 ```sh
 docker compose build
@@ -66,11 +77,24 @@ docker compose up -d api
 docker compose logs -f api
 ```
 
-Setup needs internet access. It downloads weights/configuration into the
-`speech-models` volume, recording immutable Hugging Face revisions in
-`/models/manifest.json`. Later setup runs reuse these revisions. Weights are
-excluded from the image/build context. Runtime mounts the volume read-only and
-does not download additional models. Run setup before the first prediction.
+Setup needs internet access. It downloads weights/configuration into the project
+directory `./models`, recording immutable Hugging Face revisions in
+`models/manifest.json`. Later setup runs reuse these revisions. Compose mounts
+that directory as `/models` inside the container. Weights are excluded from the
+image/build context; runtime mounts the directory read-only and does not download
+additional models. Run setup before the first prediction. The `models` folder
+is excluded from Git except for `.gitkeep`, so a new clone needs setup too.
+
+On Linux, before `docker compose run --rm download`, set the container download
+user to the host user who owns the project folder:
+
+```sh
+export LOCAL_UID="$(id -u)" LOCAL_GID="$(id -g)"
+```
+
+This lets the non-root download process write to `./models`. On Docker Desktop
+for Windows the default UID/GID usually works; ensure the project directory is
+shared with Docker Desktop if a bind-mount permission error occurs.
 
 - Interactive docs and upload form: http://localhost:8000/docs
 - OpenAPI specification: http://localhost:8000/openapi.json
@@ -78,15 +102,38 @@ does not download additional models. Run setup before the first prediction.
 
 The host port binds to loopback by default. Services in the same Compose network
 should use **`http://api:8000`**. For your main project, include the API service
-and model volume in its Compose configuration, or attach both services to the
+and model bind mount in its Compose configuration, or attach both services to the
 same Docker network. Change the host port binding explicitly for remote access.
 
-`docker compose down` preserves model weights. Adding `-v` deletes the volume
-and requires downloading again.
+`docker compose down` preserves model weights in `./models`, including when
+`-v` is supplied, because this folder is a bind mount rather than a volume.
 
-If you used the previous Compose configuration, its `oragen-models` volume is
-separate from the new `speech-models` volume. The setup command downloads weights
-into the new volume; the old volume is not removed automatically.
+If Docker reports `403 Forbidden` while fetching a Docker Hub token, check
+`docker pull python:3.12-slim` independently of the project. Sign in with
+`docker login` if appropriate, and check the Docker Desktop proxy and any
+organization registry-access policy with your administrator. The build also
+needs network access to the package repositories, and model setup needs Hugging
+Face access. Earlier versions of this Dockerfile requested the external
+`docker/dockerfile:1` frontend; this version uses the bundled frontend, but it
+still needs access to the Python base image unless that image is cached.
+
+Earlier Compose versions stored model files in a Docker-managed `speech-models`
+or `oragen-models` volume. Existing volumes are left untouched and are not
+automatically copied to `./models`. Run the download step to populate the project
+folder, or copy the existing volume's files into it before starting the service.
+
+To reuse an existing volume on Windows instead of downloading again, run the
+following from the project root, substituting the actual name from `docker volume
+ls` for `YOUR_OLD_VOLUME`:
+
+```powershell
+$oldVolume = 'YOUR_OLD_VOLUME'
+$modelsPath = (Resolve-Path .\models).Path
+docker run --rm --mount "type=volume,source=$oldVolume,target=/old,readonly" --mount "type=bind,source=$modelsPath,target=/new" python:3.12-slim sh -c "cp -R /old/. /new/"
+```
+
+This copies the files and leaves the old volume intact. Then restart the API
+with `docker compose up -d api` using the updated Compose configuration.
 
 ## Docker: NVIDIA GPU deployment
 
@@ -107,15 +154,13 @@ fails inference if CUDA is unavailable; it does not silently fall back to CPU.
 Measure VRAM using a representative recording (Linux/macOS shell):
 
 ```sh
-docker run --rm --gpus all \
-  -v gender_age_speech-models:/models:ro \
-  -v /absolute/path/to/samples:/samples:ro \
-  speech-age-gender-api:cuda python scripts/measure_vram.py /samples/recording.wav
+docker compose -f compose.yaml -f compose.gpu.yaml run --rm --no-deps \
+  --entrypoint python -v "$(pwd)/samples:/samples:ro" \
+  api scripts/measure_vram.py /samples/recording.wav
 ```
 
-The example assumes Compose project name `gender_age`; use `docker volume ls`
-to find the actual volume name. In PowerShell put the command on one line and
-use an absolute Windows path for the samples directory.
+Replace the samples path with your recording directory. In PowerShell put the
+command on one line and use an absolute Windows path for the samples directory.
 
 ## Request format
 
@@ -245,7 +290,7 @@ through tracking.
 - Maximum 32 retained jobs, **including completed jobs**. Completed jobs expire
   one hour after submission; cleanup occurs on later prediction/tracking calls.
 - Jobs/results live in process memory. Restarting loses tracking IDs and pending
-  work. The model volume persists.
+  work. Model files persist in `./models`.
 - Run **one Uvicorn worker**. Multiple replicas need a shared durable job store
   or routing that sends tracking requests to the original instance.
 - Temporary uploads are deleted after processing. Multiple speakers are not
@@ -268,10 +313,12 @@ For compatibility, the former `ORAGEN_DEVICE`, `ORAGEN_MODEL_DIR`, and
 
 ## Local development and verification
 
-Requires Python 3.12 and `uv`:
+Requires Python 3.12 and `uv`. Run from the project root; `uv sync` creates the
+virtual environment in the project's `.venv` directory. This is separate from
+Docker's Linux Python environment, which is installed inside the Docker image.
+A Docker build does not create a Windows `.venv` on the host.
 
 ```powershell
-cd C:\Yasin\gender_age
 uv sync --extra test
 .venv\Scripts\speech-age-gender.exe download
 .venv\Scripts\speech-age-gender.exe serve
@@ -279,6 +326,14 @@ uv sync --extra test
 .venv\Scripts\python.exe -m pytest -q
 .venv\Scripts\python.exe scripts/smoke_test.py recording.wav
 ```
+
+On Linux or macOS, use `.venv/bin/speech-age-gender` and `.venv/bin/python`
+instead of the Windows `.venv\Scripts\` paths above.
+
+With local Python, `download` also writes to
+the project's `models` directory by default; it uses the same model files as the
+Docker bind mount. The virtual environment and model weights are intentionally
+excluded from Git and must be set up separately on each machine.
 
 For local GPU inference use `speech-age-gender predict recording.wav --device cuda` in a
 CUDA-enabled environment. Tests cover decoding/resampling, silent/invalid audio,

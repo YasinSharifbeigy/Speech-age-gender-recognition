@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # CPU: docker build -t speech-age-gender-api .
 # CUDA: docker build --build-arg TORCH_INDEX_URL=https://download.pytorch.org/whl/cu128 -t speech-age-gender-api:cuda .
 FROM python:3.12-slim AS runtime

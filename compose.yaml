@@ -6,8 +6,11 @@ services:
       context: .
     profiles: [setup]
     command: [speech-age-gender, download]
+    user: "${LOCAL_UID:-10001}:${LOCAL_GID:-10001}"
+    environment:
+      HF_HOME: /tmp/huggingface
     volumes:
-      - speech-models:/models
+      - ./models:/models
 
   api:
     image: speech-age-gender-api:local
@@ -19,9 +22,7 @@ services:
       SPEECH_DEVICE: cpu
       SPEECH_CPU_THREADS: "4"
     volumes:
-      - speech-models:/models:ro
+      - ./models:/models:ro
     restart: unless-stopped
     stop_grace_period: 5m
 
-volumes:
-  speech-models:

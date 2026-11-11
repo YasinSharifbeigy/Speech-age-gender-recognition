@@ -6,8 +6,8 @@ from pathlib import Path
 import numpy as np
 from fastapi.testclient import TestClient
 
-from oragen_service.api import create_app
-from oragen_service.audio import InvalidAudio, decode_audio, window_bounds
+from speech_age_gender_service.api import create_app
+from speech_age_gender_service.audio import InvalidAudio, decode_audio, window_bounds
 
 
 def wav_bytes(seconds=2, stereo=False, rate=16000, silent=False):

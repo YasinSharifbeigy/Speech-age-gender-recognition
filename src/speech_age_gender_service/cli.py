@@ -22,7 +22,7 @@ def main():
         print(json.dumps(Engine(args.device).predict(args.audio), indent=2))
     else:
         import uvicorn
-        uvicorn.run("oragen_service.api:app", host=args.host, port=args.port, workers=1)
+        uvicorn.run("speech_age_gender_service.api:app", host=args.host, port=args.port, workers=1)
 
 
 if __name__ == "__main__":
