@@ -1,0 +1,27 @@
+services:
+  # Run explicitly once before starting the API: docker compose run --rm download
+  download:
+    image: speech-age-gender-api:local
+    build:
+      context: .
+    profiles: [setup]
+    command: [speech-age-gender, download]
+    volumes:
+      - speech-models:/models
+
+  api:
+    image: speech-age-gender-api:local
+    build:
+      context: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      SPEECH_DEVICE: cpu
+      SPEECH_CPU_THREADS: "4"
+    volumes:
+      - speech-models:/models:ro
+    restart: unless-stopped
+    stop_grace_period: 5m
+
+volumes:
+  speech-models:

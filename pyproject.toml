@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "speech-age-gender-service"
+version = "0.1.0"
+description = "Local speech age and gender inference service"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "torch==2.10.0", "transformers==4.57.6", "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1", "python-multipart>=0.0.20", "numpy>=2,<3",
+  "huggingface-hub>=0.34,<1", "imageio-ffmpeg>=0.6,<1", "silero-vad>=6,<7",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "httpx>=0.28"]
+
+[project.scripts]
+speech-age-gender = "oragen_service.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+oragen_service = ["ORAGEN-LICENSE.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

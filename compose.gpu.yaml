@@ -1,0 +1,23 @@
+# docker compose -f compose.yaml -f compose.gpu.yaml build
+# docker compose -f compose.yaml -f compose.gpu.yaml run --rm download
+# docker compose -f compose.yaml -f compose.gpu.yaml up -d api
+services:
+  download:
+    image: speech-age-gender-api:cuda
+    build:
+      args:
+        TORCH_INDEX_URL: https://download.pytorch.org/whl/cu128
+  api:
+    image: speech-age-gender-api:cuda
+    build:
+      args:
+        TORCH_INDEX_URL: https://download.pytorch.org/whl/cu128
+    environment:
+      SPEECH_DEVICE: cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
